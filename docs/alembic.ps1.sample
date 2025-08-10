@@ -1,0 +1,14 @@
+# Generate new migration
+alembic revision --autogenerate -m "Add campus booking models"
+
+# Apply migrations to database  
+alembic upgrade head
+
+# Check current migration status
+alembic current
+
+# See migration history
+alembic history
+
+# Rollback to previous migration (if needed)
+alembic downgrade -1
