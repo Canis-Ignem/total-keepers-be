@@ -1,0 +1,32 @@
+fastapi>=0.116.1
+fastapi[standard]>=0.116.1
+uvicorn>=0.35.0
+python-redsys>=1.2.0
+sqlalchemy>=2.0.20
+pydantic_settings>=2.0
+psycopg2-binary>=2.9.5
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Authentication and security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+fastapi-jwt-auth>=0.5.0
+
+# HTTP client for API testing
+httpx>=0.24.0
+
+psycopg2>=2.9.10
+alembic>=1.13.1
+
+# Test dependencies (optional - install with pip install -r requirements-test.txt)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-html>=3.2.0
+factory-boy>=3.3.0
+faker>=19.0.0
+freezegun>=1.2.2
+responses>=0.23.0

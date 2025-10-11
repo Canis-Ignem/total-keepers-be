@@ -1,0 +1,112 @@
+# Multi-stage build for production-ready FastAPI backend
+FROM python:3.12-slim as builder
+
+# Set build-time arguments
+ARG DEBIAN_FRONTEND=noninteractive
+
+# REDSYS
+
+ENV REDSYS_SANDBOX=True
+ENV REDSYS_MERCHANT_URL=https://total-keeper-db.whitemeadow-ce92d559.northeurope.azurecontainerapps.io/api/v1/payments/redsys-callback
+
+# API Settings
+ENV DEBUG=true
+ENV ENVIRONMENT=development
+
+# JWT Authentication settings
+#JWT_SECRET=dc6f66b5a75b258d89080791c07058a53afb53a0ee31728315263641e6de1393
+ENV JWT_ALGORITHM=HS256
+ENV ACCESS_TOKEN_EXPIRE_MINUTES=1440
+ENV REFRESH_TOKEN_EXPIRE_DAYS=30
+
+
+
+# GOOGLE
+ENV GOOGLE_CREDENTIALS_FILE=keys/total-keepers-6492ff87b584.json
+ENV NOREPLY_EMAIL=no-reply@totalkeepers.com
+ENV ADMIN_EMAIL=admin@totalkeepers.com
+
+# Gmail SMTP
+ENV SMTP_SERVER=smtp.gmail.com
+ENV SMTP_HOST=smtp.gmail.com
+ENV SMTP_PORT=587
+ENV SMTP_TLS=True
+ENV SMTP_USERNAME=jonperezetxebarria@gmail.com
+ENV SMTP_USER=jonperezetxebarria@gmail.com
+ENV SMTP_FROM_EMAIL=jonperezetxebarria@gmail.com
+ENV SMTP_FROM_NAME="Total Keepers"
+ENV EMAIL_FROM=no-reply@totalkeepers.com
+ENV FINANCE_EMAIL=totalkeepersbilbao@gmail.com
+
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements first for better layer caching
+COPY requirements_real.txt requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Production stage
+FROM python:3.12-slim as production
+
+# Set environment variables for production
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app"
+
+# Install runtime dependencies only
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
+
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Create non-root user for security
+RUN groupadd -g 1001 appuser && \
+    useradd -r -u 1001 -g appuser appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy application code with proper ownership
+COPY --chown=appuser:appuser . .
+
+# Ensure seed script is executable (copy real file to avoid symlinks)
+COPY --chown=appuser:appuser seed_db_real.py seed_db.py
+RUN chmod +x seed_db.py
+
+# Create startup script for initialization tasks
+COPY startup.py /app/startup.py
+
+# Make startup script executable
+RUN chmod +x /app/startup.py
+
+# Switch to non-root user
+USER appuser
+
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Use Python startup script as entrypoint
+ENTRYPOINT ["python", "/app/startup.py"]
