@@ -30,3 +30,6 @@ factory-boy>=3.3.0
 faker>=19.0.0
 freezegun>=1.2.2
 responses>=0.23.0
+
+# Azure
+azure-communication-email>=1.0.0

@@ -1,6 +1,6 @@
 """
-Seed script for goalkeeper gloves products
-Run this script to populate the database with sample products
+Update script for goalkeeper gloves products
+Run this script to update existing products without deleting them (preserves order relationships)
 """
 
 import sys
@@ -20,20 +20,11 @@ from datetime import datetime, timezone, timedelta
 Base.metadata.create_all(bind=engine)
 
 
-def seed_products():
-    # Prune (delete) all relevant tables before seeding
-
-    """Seed the database with sample goalkeeper gloves"""
+def update_products():
+    """Update the database with sample goalkeeper gloves (preserves existing orders)"""
     db: Session = SessionLocal()
 
-    print("Pruning database...")
-    db.execute(text("DELETE FROM product_translations"))
-    db.execute(text("DELETE FROM product_sizes"))
-    db.execute(text("DELETE FROM product_tags"))
-    db.execute(text("DELETE FROM tags"))
-    db.execute(text("DELETE FROM products"))
-    db.execute(text("DELETE FROM discount_codes"))
-    db.commit()
+    print("Updating database (preserving order relationships)...")
 
     try:
         # Create tags first
@@ -54,6 +45,7 @@ def seed_products():
                 db.add(tag)
                 db.flush()
                 created_tags[tag_data["name"]] = tag
+                print(f"Created tag: {tag_data['name']}")
             else:
                 created_tags[tag_data["name"]] = existing_tag
 
@@ -100,7 +92,7 @@ def seed_products():
                     {"size": "11", "stock_quantity": 0, "is_available": False},
                     {"size": "11.5", "stock_quantity": 0, "is_available": False},
                 ],
-                "tags": ["Profesional", "armado", "roll negativo", "blanco"],
+                "tags": ["profesional", "armado", "roll negativo", "blanco"],
             },
             {
                 "id": "goti_pro_negro",
@@ -140,7 +132,7 @@ def seed_products():
                     {"size": "11", "stock_quantity": 0, "is_available": False},
                     {"size": "11.5", "stock_quantity": 0, "is_available": False},
                 ],
-                "tags": ["Profesional", "armado", "roll negativo", "blanco"],
+                "tags": ["profesional", "armado", "roll negativo", "blanco"],
             },
             {
                 "id": "gekko_light_ligero",
@@ -182,7 +174,7 @@ def seed_products():
                     {"size": "11", "stock_quantity": 0, "is_available": False},
                     {"size": "11.5", "stock_quantity": 0, "is_available": False},
                 ],
-                "tags": ["Profesional", "ligero", "negativo", "negro"],
+                "tags": ["profesional", "ligero", "negativo", "negro"],
             },
             {
                 "id": "gekko_light_white",
@@ -224,7 +216,7 @@ def seed_products():
                     {"size": "11", "stock_quantity": 0, "is_available": False},
                     {"size": "11.5", "stock_quantity": 0, "is_available": False},
                 ],
-                "tags": ["Profesional", "ligero", "negativo", "negro"],
+                "tags": ["profesional", "ligero", "negativo", "negro"],
             },
             {
                 "id": "gekko_ap_black",
@@ -265,7 +257,7 @@ def seed_products():
                     {"size": "11", "stock_quantity": 2, "is_available": True},
                     {"size": "11.5", "stock_quantity": 0, "is_available": False},
                 ],
-                "tags": ["Profesional", "ligero", "negativo", "negro", "ajuste"],
+                "tags": ["profesional", "ligero", "negativo", "negro", "ajuste"],
             },
             {
                 "id": "gekko_ap_white",
@@ -306,7 +298,7 @@ def seed_products():
                     {"size": "11", "stock_quantity": 2, "is_available": True},
                     {"size": "11.5", "stock_quantity": 0, "is_available": False},
                 ],
-                "tags": ["Profesional", "ligero", "negativo", "blanco", "ajuste"],
+                "tags": ["profesional", "ligero", "negativo", "blanco", "ajuste"],
             }
         ]
 
@@ -341,6 +333,16 @@ def seed_products():
 🔹 Ideal for those seeking a glove that makes them stronger\n
 """,
             },
+            "gekko_light_white": {
+                "name": "GEKKO LIGHT PRO - White",
+                "short_description": "High-end lightweight glove, comfortable and snug fit.",
+                "description": """
+🔹 Also features premium German Supreme Contact latex for elite-level grip.\n
+🔹 Negative cut provides a snug, comfortable fit.\n
+🔹 Backhand made from elastic knit for a lighter, more flexible feel.\n
+🔹 Removable wrist strap lets you adapt the glove to your playing style.\n
+""",
+            },
             "gekko_ap_black": {
                 "name": "GEKKO AP - BLACK",
                 "short_description": "Lightness and comfort in a glove.",
@@ -370,66 +372,129 @@ def seed_products():
             existing_product = (
                 db.query(Product).filter(Product.id == product_data["id"]).first()
             )
+            
             if existing_product:
-                print(f"Product {product_data['id']} already exists, skipping...")
-                continue
+                print(f"Updating product: {product_data['id']}")
+                
+                # Update product fields
+                existing_product.name = product_data["name"]
+                existing_product.short_description = product_data["short_description"]
+                existing_product.description = product_data["description"]
+                existing_product.price = product_data["price"]
+                existing_product.discount_price = product_data.get("discount_price", None)
+                existing_product.img = product_data["img"]
+                existing_product.images = product_data.get("images", [])
+                existing_product.category = product_data["category"]
+                existing_product.tag = product_data["tag"]
+                existing_product.priority = product_data.get("priority", 0)
+                existing_product.is_active = True
+                
+                # Update translations
+                # Delete existing translations for this product
+                db.query(ProductTranslation).filter(
+                    ProductTranslation.product_id == product_data["id"]
+                ).delete()
+                
+                # Add new translations
+                translations = [
+                    {
+                        "language_code": "es",
+                        "name": product_data["name"],
+                        "short_description": product_data["short_description"],
+                        "description": product_data["description"],
+                    },
+                    {
+                        "language_code": "en",
+                        "name": english_translations[product_data["id"]]["name"],
+                        "short_description": english_translations[product_data["id"]][
+                            "short_description"
+                        ],
+                        "description": english_translations[product_data["id"]][
+                            "description"
+                        ],
+                    },
+                ]
+                for trans in translations:
+                    translation = ProductTranslation(product_id=existing_product.id, **trans)
+                    db.add(translation)
+                
+                # Update sizes
+                # Delete existing sizes for this product
+                db.query(ProductSize).filter(
+                    ProductSize.product_id == product_data["id"]
+                ).delete()
+                
+                # Add new sizes
+                for size_data in product_data["sizes"]:
+                    product_size = ProductSize(product_id=existing_product.id, **size_data)
+                    db.add(product_size)
+                
+                # Update tags - clear existing and add new
+                existing_product.tags.clear()
+                for tag_name in product_data["tags"]:
+                    tag_name_lower = tag_name.lower()
+                    if tag_name_lower in created_tags:
+                        existing_product.tags.append(created_tags[tag_name_lower])
+                
+                print(f"✅ Updated product: {existing_product.name}")
+            else:
+                print(f"Creating new product: {product_data['id']}")
+                
+                # Create product
+                product = Product(
+                    id=product_data["id"],
+                    name=product_data["name"],
+                    short_description=product_data["short_description"],
+                    description=product_data["description"],
+                    price=product_data["price"],
+                    discount_price=product_data.get("discount_price", None),
+                    img=product_data["img"],
+                    images=product_data.get("images", []),
+                    category=product_data["category"],
+                    tag=product_data["tag"],
+                    priority=product_data.get("priority", 0),
+                    is_active=True,
+                )
+                db.add(product)
+                db.flush()
 
-            print(product_data.get("discount_price", None))
+                # Add translations (Spanish and English)
+                translations = [
+                    {
+                        "language_code": "es",
+                        "name": product_data["name"],
+                        "short_description": product_data["short_description"],
+                        "description": product_data["description"],
+                    },
+                    {
+                        "language_code": "en",
+                        "name": english_translations[product_data["id"]]["name"],
+                        "short_description": english_translations[product_data["id"]][
+                            "short_description"
+                        ],
+                        "description": english_translations[product_data["id"]][
+                            "description"
+                        ],
+                    },
+                ]
+                for trans in translations:
+                    translation = ProductTranslation(product_id=product.id, **trans)
+                    db.add(translation)
 
-            # Create product
-            product = Product(
-                id=product_data["id"],
-                name=product_data["name"],
-                short_description=product_data["short_description"],
-                description=product_data["description"],
-                price=product_data["price"],
-                discount_price=product_data.get("discount_price", None),
-                img=product_data["img"],
-                images=product_data.get("images", []),
-                category=product_data["category"],
-                tag=product_data["tag"],
-                priority=product_data.get("priority", 0),
-                is_active=True,
-            )
-            db.add(product)
-            db.flush()
+                # Add sizes
+                for size_data in product_data["sizes"]:
+                    product_size = ProductSize(product_id=product.id, **size_data)
+                    db.add(product_size)
 
-            # Add translations (Spanish and English)
-            translations = [
-                {
-                    "language_code": "es",
-                    "name": product_data["name"],
-                    "short_description": product_data["short_description"],
-                    "description": product_data["description"],
-                },
-                {
-                    "language_code": "en",
-                    "name": english_translations[product_data["id"]]["name"],
-                    "short_description": english_translations[product_data["id"]][
-                        "short_description"
-                    ],
-                    "description": english_translations[product_data["id"]][
-                        "description"
-                    ],
-                },
-            ]
-            for trans in translations:
-                translation = ProductTranslation(product_id=product.id, **trans)
-                db.add(translation)
+                # Add tags
+                for tag_name in product_data["tags"]:
+                    tag_name_lower = tag_name.lower()
+                    if tag_name_lower in created_tags:
+                        product.tags.append(created_tags[tag_name_lower])
 
-            # Add sizes
-            for size_data in product_data["sizes"]:
-                product_size = ProductSize(product_id=product.id, **size_data)
-                db.add(product_size)
+                print(f"✅ Created product: {product.name}")
 
-            # Add tags
-            for tag_name in product_data["tags"]:
-                if tag_name in created_tags:
-                    product.tags.append(created_tags[tag_name])
-
-            print(f"Created product: {product.name}")
-
-        # Create discount codes
+        # Create or update discount codes
         discount_codes = [
             {
                 "id": "PROMO10",
@@ -510,18 +575,18 @@ def seed_products():
                 )
 
         db.commit()
-
-        db.commit()
-        print("✅ Database seeded successfully with goalkeeper gloves!")
+        print("\n✅ Database updated successfully with goalkeeper gloves!")
 
     except Exception as e:
         db.rollback()
-        print(f"❌ Error seeding database: {str(e)}")
+        print(f"❌ Error updating database: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    print("🌱 Seeding database with goalkeeper gloves...")
-    seed_products()
+    print("🔄 Updating database with goalkeeper gloves...")
+    update_products()

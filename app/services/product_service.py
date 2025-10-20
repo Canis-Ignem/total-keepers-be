@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
 # Local application imports
-from app.models.product import Product, ProductSize, Tag, ProductTranslation
+from app.models.product import Product, ProductSize, Tag
+from app.models.product import ProductTranslation as ProductTranslationModel
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
@@ -137,8 +138,26 @@ class ProductService:
 
             # Update basic fields
             for field, value in product_data.model_dump(exclude_unset=True).items():
-                if field not in ["sizes", "tag_names"] and hasattr(db_product, field):
+                if field not in ["sizes", "translations", "tag_names"] and hasattr(db_product, field):
                     setattr(db_product, field, value)
+
+            # Update translations if provided
+            if product_data.translations is not None:
+                # Remove existing translations
+                db.query(ProductTranslationModel).filter(
+                    ProductTranslationModel.product_id == product_id
+                ).delete()
+
+                # Add new translations
+                for trans_data in product_data.translations:
+                    db_translation = ProductTranslationModel(
+                        product_id=product_id,
+                        language_code=trans_data.language_code,
+                        name=trans_data.name,
+                        short_description=trans_data.short_description,
+                        description=trans_data.description,
+                    )
+                    db.add(db_translation)
 
             # Update sizes if provided
             if product_data.sizes is not None:
@@ -305,8 +324,10 @@ class ProductService:
             "price": product.price,
             "discount_price": product.discount_price,
             "img": product.img,
+            "images": product.images,  # Include images array
             "category": product.category,
             "tag": product.tag,
+            "priority": product.priority,  # Include priority field
             "is_active": product.is_active,
             "created_at": product.created_at,
             "updated_at": product.updated_at,

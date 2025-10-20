@@ -6,6 +6,15 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
+# Third-party imports
+try:
+    from azure.communication.email import EmailClient
+    AZURE_EMAIL_AVAILABLE = True
+except ImportError:
+    AZURE_EMAIL_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("Azure Communication Email SDK not installed. Install with: pip install azure-communication-email")
+
 # Local application imports
 from app.core.config import settings
 from app.schemas.campus import BookingSummary
@@ -14,6 +23,53 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
+    @staticmethod
+    def send_email_azure(
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None,
+    ) -> bool:
+        """Send an email using Azure Communication Services"""
+        if not AZURE_EMAIL_AVAILABLE:
+            logger.warning("Azure Communication Email SDK not available")
+            return False
+            
+        if not settings.AZURE_COMMUNICATION_CONNECTION_STRING or not settings.AZURE_EMAIL_SENDER:
+            logger.warning("Azure Communication Services not configured. Set AZURE_COMMUNICATION_CONNECTION_STRING and AZURE_EMAIL_SENDER")
+            return False
+
+        try:
+            # Create Azure Email client
+            email_client = EmailClient.from_connection_string(
+                settings.AZURE_COMMUNICATION_CONNECTION_STRING
+            )
+
+            # Prepare email message
+            message = {
+                "senderAddress": settings.AZURE_EMAIL_SENDER,
+                "recipients": {
+                    "to": [{"address": to_email}]
+                },
+                "content": {
+                    "subject": subject,
+                    "plainText": text_content or "Please view this email in HTML format.",
+                    "html": html_content
+                }
+            }
+
+            # Send email
+            logger.info(f"Sending email via Azure Communication Services to {to_email}")
+            poller = email_client.begin_send(message)
+            result = poller.result()
+            
+            logger.info(f"Azure email sent successfully to {to_email}. Message ID: {result['id']}, Status: {result['status']}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send email via Azure Communication Services to {to_email}: {str(e)}")
+            return False
+
     @staticmethod
     def send_email(
         to_email: str,
@@ -81,310 +137,54 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {str(e)}")
             return False
-
-    @staticmethod
-    def send_booking_confirmation_to_participant(
-        booking_summary: BookingSummary,
-    ) -> bool:
-        """Send booking confirmation email to participant"""
-        subject = f"Campus Booking Confirmation - {booking_summary.booking_reference}"
-
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <style>
-                .container {{ max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; }}
-                .header {{ background-color: #1e40af; color: white; padding: 20px; text-align: center; }}
-                .content {{ padding: 20px; }}
-                .booking-details {{ background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-                .footer {{ background-color: #f9fafb; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🥅 Total Keepers Campus</h1>
-                    <h2>Booking Confirmation</h2>
-                </div>
-                
-                <div class="content">
-                    <h3>Hello {booking_summary.participant_name}!</h3>
-                    
-                    <p>Thank you for registering for our goalkeeper training campus! Your booking has been confirmed.</p>
-                    
-                    <div class="booking-details">
-                        <h4>📋 Booking Details</h4>
-                        <p><strong>Booking Reference:</strong> {booking_summary.booking_reference}</p>
-                        <p><strong>Session:</strong> {booking_summary.session_title}</p>
-                        <p><strong>Date & Time:</strong> {booking_summary.session_date.strftime("%A, %B %d, %Y at %I:%M %p")}</p>
-                        <p><strong>Location:</strong> {booking_summary.session_location}</p>
-                        <p><strong>Coach:</strong> {booking_summary.coach_name}</p>
-                    </div>
-                    
-                    <h4>📝 What to Bring:</h4>
-                    <ul>
-                        <li>Goalkeeper gloves</li>
-                        <li>Comfortable training clothes</li>
-                        <li>Water bottle</li>
-                        <li>Positive attitude!</li>
-                    </ul>
-                    
-                    <h4>📍 Important Information:</h4>
-                    <ul>
-                        <li>Please arrive 15 minutes before the session starts</li>
-                        <li>If you need to cancel, please contact us at least 24 hours in advance</li>
-                        <li>In case of weather concerns, we'll notify you via email</li>
-                    </ul>
-                    
-                    <p>We're excited to see you on the field! If you have any questions, feel free to contact us.</p>
-                    
-                    <p>Best regards,<br>
-                    <strong>Total Keepers Team</strong><br>
-                    aitorpeetxe@gmail.com</p>
-                </div>
-                
-                <div class="footer">
-                    <p>Total Keepers - Elite Goalkeeper Training Campus</p>
-                    <p>This email was sent regarding your booking reference: {booking_summary.booking_reference}</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-
-        text_content = f"""
-        Total Keepers Campus - Booking Confirmation
-        
-        Hello {booking_summary.participant_name}!
-        
-        Thank you for registering for our goalkeeper training campus! Your booking has been confirmed.
-        
-        BOOKING DETAILS:
-        - Reference: {booking_summary.booking_reference}
-        - Session: {booking_summary.session_title}
-        - Date: {booking_summary.session_date.strftime("%A, %B %d, %Y at %I:%M %p")}
-        - Location: {booking_summary.session_location}
-        - Coach: {booking_summary.coach_name}
-        
-        What to bring:
-        - Goalkeeper gloves
-        - Comfortable training clothes
-        - Water bottle
-        - Positive attitude!
-        
-        Important:
-        - Arrive 15 minutes early
-        - Cancel 24 hours in advance if needed
-        - Check email for weather updates
-        
-        Questions? Contact us at aitorpeetxe@gmail.com
-        
-        Best regards,
-        Total Keepers Team
-        """
-
-        return EmailService.send_email(
-            booking_summary.participant_email, subject, html_content, text_content
-        )
-
-    @staticmethod
-    def send_booking_notification_to_organizer(booking_summary: BookingSummary) -> bool:
-        """Send booking notification email to organizer"""
-        subject = f"New Campus Booking - {booking_summary.booking_reference}"
-
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <style>
-                .container {{ max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; }}
-                .header {{ background-color: #059669; color: white; padding: 20px; text-align: center; }}
-                .content {{ padding: 20px; }}
-                .booking-details {{ background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🆕 New Campus Booking</h1>
-                </div>
-                
-                <div class="content">
-                    <h3>New participant registration!</h3>
-                    
-                    <div class="booking-details">
-                        <h4>📋 Booking Details</h4>
-                        <p><strong>Reference:</strong> {booking_summary.booking_reference}</p>
-                        <p><strong>Participant:</strong> {booking_summary.participant_name}</p>
-                        <p><strong>Email:</strong> {booking_summary.participant_email}</p>
-                        <p><strong>Session:</strong> {booking_summary.session_title}</p>
-                        <p><strong>Date:</strong> {booking_summary.session_date.strftime("%A, %B %d, %Y at %I:%M %p")}</p>
-                        <p><strong>Location:</strong> {booking_summary.session_location}</p>
-                        <p><strong>Coach:</strong> {booking_summary.coach_name}</p>
-                    </div>
-                    
-                    <p>The participant has been automatically sent a confirmation email with all the details.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-
-        return EmailService.send_email("aitorpeetxe@gmail.com", subject, html_content)
-
-    @staticmethod
-    def send_welcome_email(user_email: str, user_name: str) -> bool:
-        """Send welcome email to new user"""
-        subject = "Welcome to Total Keepers! 🥅"
-
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Welcome to Total Keepers</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        color: white; padding: 30px; text-align: center;">
-                <h1 style="margin: 0;">🥅 Welcome to Total Keepers!</h1>
-                <p style="margin: 10px 0 0 0; font-size: 18px;">Elite Goalkeeper Training Academy</p>
-            </div>
-            
-            <div style="padding: 30px 20px;">
-                <h2 style="color: #2c3e50;">Hello {user_name}! 👋</h2>
-                
-                <p>Welcome to the Total Keepers family! We're excited to have you join our 
-                elite goalkeeper training community.</p>
-                
-                <div style="background: #f8f9fa; border-left: 4px solid #3498db; 
-                            padding: 20px; margin: 25px 0;">
-                    <h3 style="margin-top: 0; color: #2c3e50;">🎯 What's Next?</h3>
-                    <ul style="margin-bottom: 0;">
-                        <li>Browse our training sessions and camps</li>
-                        <li>Book your first goalkeeper training session</li>
-                        <li>Join our community of dedicated goalkeepers</li>
-                        <li>Access exclusive training resources</li>
-                    </ul>
-                </div>
-                
-                <div style="background: #e8f5e8; border: 1px solid #4caf50; 
-                            padding: 20px; margin: 25px 0; border-radius: 5px;">
-                    <h4 style="margin-top: 0; color: #2e7d32;">🎁 Special Welcome Offer</h4>
-                    <p style="margin-bottom: 0;">Use code <strong>WELCOME2025</strong> 
-                    for 10% off your first training session!</p>
-                </div>
-                
-                <p>If you have any questions or need assistance, feel free to reach out to our team.</p>
-                
-                <p>Best regards,<br>
-                <strong>The Total Keepers Team</strong><br>
-                Elite Goalkeeper Training Academy</p>
-            </div>
-            
-            <div style="background: #34495e; color: white; padding: 20px; 
-                        text-align: center; font-size: 12px;">
-                <p style="margin: 0;">Thank you for choosing Total Keepers!</p>
-                <p style="margin: 5px 0 0 0;">For support, contact: info@totalkeepers.com</p>
-            </div>
-        </body>
-        </html>
-        """
-
-        text_content = f"""
-        Welcome to Total Keepers! 🥅
-        
-        Hello {user_name}!
-        
-        Welcome to the Total Keepers family! We're excited to have you join our 
-        elite goalkeeper training community.
-        
-        What's Next:
-        - Browse our training sessions and camps
-        - Book your first goalkeeper training session
-        - Join our community of dedicated goalkeepers
-        - Access exclusive training resources
-        
-        Special Welcome Offer:
-        Use code WELCOME2025 for 10% off your first training session!
-        
-        If you have any questions, contact us at info@totalkeepers.com
-        
-        Best regards,
-        The Total Keepers Team
-        Elite Goalkeeper Training Academy
-        """
-
-        try:
-            return EmailService.send_email(
-                user_email, subject, html_content, text_content
-            )
-        except Exception as e:
-            logger.error(f"Failed to send welcome email to {user_email}: {str(e)}")
             return False
 
     @staticmethod
-    def send_noreply_email(
+    def send_email_dual(
         to_email: str,
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
-    ) -> bool:
-        """Send a no-reply email with explicit no-reply headers"""
+    ) -> dict:
+        """
+        Send email via both Gmail SMTP and Azure Communication Services for redundancy.
+        Returns dict with status of each service.
+        """
+        results = {
+            "gmail": False,
+            "azure": False,
+            "success": False
+        }
+
+        # Try Gmail SMTP
         try:
-            # Create message
-            msg = MIMEMultipart("alternative")
-
-            # Use the actual sending email for SMTP auth
-            actual_from_email = settings.SMTP_FROM_EMAIL or settings.EMAIL_FROM
-            from_name = settings.SMTP_FROM_NAME
-            noreply_email = settings.NOREPLY_EMAIL
-
-            # Set up clear no-reply headers
-            msg["From"] = f"{from_name} <{noreply_email}>"
-            msg["To"] = to_email
-            msg["Subject"] = subject
-            msg["Reply-To"] = noreply_email
-            msg["Sender"] = actual_from_email
-            msg["X-Auto-Response-Suppress"] = "All"  # Suppress auto-replies
-            msg["Auto-Submitted"] = "auto-generated"  # Mark as automated
-
-            # Add text and HTML parts
-            if text_content:
-                text_part = MIMEText(text_content, "plain")
-                msg.attach(text_part)
-
-            html_part = MIMEText(html_content, "html")
-            msg.attach(html_part)
-
-            # Send email using Gmail SMTP
-            smtp_server = settings.SMTP_SERVER or settings.SMTP_HOST
-            smtp_username = settings.SMTP_USERNAME or settings.SMTP_USER
-            smtp_password = settings.SMTP_PASSWORD
-
-            if not smtp_username or not smtp_password:
-                logger.error(
-                    "SMTP credentials not configured. Check SMTP_USERNAME and SMTP_PASSWORD in .env"
-                )
-                return False
-
-            logger.info(f"Sending no-reply email to {to_email}")
-            with smtplib.SMTP(smtp_server, settings.SMTP_PORT) as server:
-                if settings.SMTP_TLS:
-                    server.starttls()
-
-                server.login(smtp_username, smtp_password)
-                server.send_message(msg)
-
-            logger.info(f"No-reply email sent successfully to {to_email}")
-            return True
-
+            gmail_result = EmailService.send_email(to_email, subject, html_content, text_content)
+            results["gmail"] = gmail_result
+            if gmail_result:
+                logger.info(f"Gmail SMTP delivery successful to {to_email}")
         except Exception as e:
-            logger.error(f"Failed to send no-reply email to {to_email}: {str(e)}")
-            return False
+            logger.error(f"Gmail SMTP delivery failed to {to_email}: {str(e)}")
+            results["gmail"] = False
+
+        # Try Azure Communication Services
+        try:
+            azure_result = EmailService.send_email_azure(to_email, subject, html_content, text_content)
+            results["azure"] = azure_result
+            if azure_result:
+                logger.info(f"Azure Communication Services delivery successful to {to_email}")
+        except Exception as e:
+            logger.error(f"Azure Communication Services delivery failed to {to_email}: {str(e)}")
+            results["azure"] = False
+
+        # Mark as success if at least one method succeeded
+        results["success"] = results["gmail"] or results["azure"]
+        
+        if results["success"]:
+            logger.info(f"Email delivered successfully to {to_email} (Gmail: {results['gmail']}, Azure: {results['azure']})")
+        else:
+            logger.error(f"All email delivery methods failed for {to_email}")
+        
+        return results
 
     @staticmethod
     def send_payment_success_notification(
@@ -680,20 +480,187 @@ class EmailService:
             logger.info(
                 f"Attempting to send Spanish invoice email for order {order_id} to {admin_email}"
             )
-            result = EmailService.send_email(
+            # Send via both Gmail and Azure for redundancy
+            results = EmailService.send_email_dual(
                 admin_email, subject, html_content, text_content
             )
-            if result:
+            
+            if results["success"]:
                 logger.info(
-                    f"Spanish invoice email sent successfully for order {order_id}"
+                    f"Spanish invoice email sent successfully for order {order_id} "
+                    f"(Gmail: {results['gmail']}, Azure: {results['azure']})"
                 )
             else:
                 logger.error(
-                    f"Failed to send Spanish invoice email for order {order_id}"
+                    f"Failed to send Spanish invoice email for order {order_id} via all methods"
                 )
-            return result
+            
+            return results["success"]
         except Exception as e:
             logger.error(
                 f"Exception sending Spanish invoice email for order {order_id}: {str(e)}"
+            )
+            return False
+
+    @staticmethod
+    def send_customer_order_confirmation(
+        customer_email: str,
+        customer_name: str,
+        order_id: str,
+        order_items: list = None,
+    ) -> bool:
+        """Send Spanish order confirmation email to customer"""
+        subject = f"Confirmación de Pedido - Total Keepers #{order_id}"
+
+        # Build product list
+        product_list_html = ""
+        product_list_text = ""
+        
+        if order_items:
+            for item in order_items:
+                product_name = item.get("product_name", "Producto")
+                size = item.get("size", "N/A")
+                quantity = item.get("quantity", 1)
+                
+                product_list_html += f"<li><strong>{product_name}</strong> - Talla: {size} - Cantidad: {quantity}</li>\n"
+                product_list_text += f"- {product_name} - Talla: {size} - Cantidad: {quantity}\n"
+        else:
+            product_list_html = "<li>Tu pedido</li>"
+            product_list_text = "- Tu pedido\n"
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }}
+                .email-container {{ max-width: 600px; margin: 0 auto; background-color: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
+                .header {{ background-color: #1e40af; color: white; padding: 30px; text-align: center; }}
+                .logo {{ font-size: 32px; font-weight: bold; margin-bottom: 10px; }}
+                .content {{ padding: 30px; line-height: 1.8; }}
+                .greeting {{ font-size: 18px; margin-bottom: 20px; }}
+                .order-section {{ background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+                .order-list {{ list-style: none; padding-left: 0; }}
+                .order-list li {{ padding: 10px 0; border-bottom: 1px solid #dee2e6; }}
+                .order-list li:last-child {{ border-bottom: none; }}
+                .message {{ color: #374151; font-size: 15px; }}
+                .footer {{ background-color: #1e40af; color: white; padding: 25px; text-align: center; }}
+                .footer-links {{ margin-top: 15px; }}
+                .footer-links a {{ color: white; text-decoration: none; margin: 0 10px; }}
+                .social {{ margin-top: 10px; font-size: 14px; }}
+            </style>
+        </head>
+        <body>
+            <div class="email-container">
+                <!-- Header -->
+                <div class="header">
+                    <div class="logo">🥅 TOTAL KEEPERS</div>
+                    <div>Confirmación de Pedido</div>
+                </div>
+
+                <!-- Content -->
+                <div class="content">
+                    <div class="greeting">
+                        <strong>Hola {customer_name},</strong>
+                    </div>
+
+                    <p class="message">
+                        Gracias por tu compra.
+                    </p>
+
+                    <p class="message">
+                        Te confirmamos que hemos recibido correctamente tu pedido de:
+                    </p>
+
+                    <!-- Order Items -->
+                    <div class="order-section">
+                        <ul class="order-list">
+                            {product_list_html}
+                        </ul>
+                    </div>
+
+                    <p class="message">
+                        Nuestro equipo de <strong>TOTAL KEEPERS</strong> preparará tu pedido con el mayor cuidado y la mayor 
+                        rapidez para que lo recibas lo antes posible.
+                    </p>
+
+                    <p class="message">
+                        Agradecemos tu confianza en <strong>TOTAL KEEPERS GLOVES</strong>.
+                    </p>
+
+                    <p class="message">
+                        Seguimos trabajando para ofrecerte los mejores guantes y la mejor protección bajo los palos.
+                    </p>
+
+                    <p class="message" style="margin-top: 30px;">
+                        Atentamente,<br>
+                        <strong>TOTAL KEEPERS</strong>
+                    </p>
+                </div>
+
+                <!-- Footer -->
+                <div class="footer">
+                    <p style="margin: 0;"><strong>TOTAL KEEPERS</strong></p>
+                    <div class="footer-links">
+                        <a href="mailto:totalkeepersbilbao@gmail.com">totalkeepersbilbao@gmail.com</a><br>
+                        <a href="https://totalkeepers.net/" target="_blank">https://totalkeepers.net/</a>
+                    </div>
+                    <div class="social">
+                        Redes sociales: @totalkeepers
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        text_content = f"""
+Hola {customer_name},
+
+Gracias por tu compra.
+
+Te confirmamos que hemos recibido correctamente tu pedido de:
+
+{product_list_text}
+
+Nuestro equipo de TOTAL KEEPERS preparará tu pedido con el mayor cuidado y la mayor
+rapidez para que lo recibas lo antes posible.
+
+Agradecemos tu confianza en TOTAL KEEPERS GLOVES.
+
+Seguimos trabajando para ofrecerte los mejores guantes y la mejor protección bajo los
+palos.
+
+Atentamente,
+TOTAL KEEPERS
+
+totalkeepersbilbao@gmail.com
+https://totalkeepers.net/
+Redes sociales: @totalkeepers
+        """
+
+        try:
+            logger.info(
+                f"Attempting to send customer confirmation email for order {order_id} to {customer_email}"
+            )
+            # Send ONLY via Azure Communication Services (not Gmail)
+            azure_result = EmailService.send_email_azure(
+                customer_email, subject, html_content, text_content
+            )
+            
+            if azure_result:
+                logger.info(
+                    f"✅ Customer confirmation email sent successfully via Azure for order {order_id} to {customer_email}"
+                )
+            else:
+                logger.error(
+                    f"❌ Failed to send customer confirmation email via Azure for order {order_id}"
+                )
+            
+            return azure_result
+        except Exception as e:
+            logger.error(
+                f"Exception sending customer confirmation email for order {order_id}: {str(e)}"
             )
             return False

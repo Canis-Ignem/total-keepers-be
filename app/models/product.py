@@ -11,9 +11,11 @@ from sqlalchemy import (
     ForeignKey,
     Table,
     DateTime,
+    ARRAY,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 
 # Local application imports
 from app.core.database import Base
@@ -49,7 +51,8 @@ class Product(Base):
     discount_price = Column(Float)  # Nullable, for sales
     short_description = Column(String(255))  # Default/fallback short text
     description = Column(Text)  # Default/fallback markdown
-    img = Column(String(500))  # Image path/URL
+    img = Column(String(500))  # Image path/URL (legacy, kept for backward compatibility)
+    images = Column(PG_ARRAY(String))  # List of publicly accessible blob URLs
     category = Column(String(100), default="GOALKEEPER_GLOVES")  # Product category
     tag = Column(String(50))  # Main tag like "JUNIOR", "SENIOR", etc.
     priority = Column(Integer, default=0, index=True)  # Display priority (higher = shown first)

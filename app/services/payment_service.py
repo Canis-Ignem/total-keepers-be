@@ -612,6 +612,50 @@ class RedsysPaymentService:
                                 f"❌ Failed to send Spanish invoice email for order {order.id}"
                             )
 
+                        # Send customer confirmation email
+                        if customer_email:
+                            try:
+                                logger.info(
+                                    f"Attempting to send customer confirmation email for order {order.id}"
+                                )
+                                
+                                # Extract customer name
+                                customer_name = "Cliente"
+                                if hasattr(order, "customer_first_name") and order.customer_first_name:
+                                    customer_name = order.customer_first_name
+                                    if hasattr(order, "customer_last_name") and order.customer_last_name:
+                                        customer_name = f"{order.customer_first_name} {order.customer_last_name}"
+                                elif shipping_address_data:
+                                    first_name = shipping_address_data.get("first_name", "")
+                                    last_name = shipping_address_data.get("last_name", "")
+                                    if first_name:
+                                        customer_name = f"{first_name} {last_name}".strip()
+                                
+                                customer_email_sent = EmailService.send_customer_order_confirmation(
+                                    customer_email=customer_email,
+                                    customer_name=customer_name,
+                                    order_id=str(order.id),
+                                    order_items=order_items,
+                                )
+                                
+                                if customer_email_sent:
+                                    logger.info(
+                                        f"✅ Customer confirmation email sent successfully for order {order.id} to {customer_email}"
+                                    )
+                                else:
+                                    logger.error(
+                                        f"❌ Failed to send customer confirmation email for order {order.id}"
+                                    )
+                            except Exception as e:
+                                # Don't fail payment processing if customer email fails
+                                logger.error(
+                                    f"❌ Exception sending customer confirmation email for order {order.id}: {e}"
+                                )
+                        else:
+                            logger.info(
+                                f"ℹ️  No customer email available for order {order.id}, skipping customer confirmation"
+                            )
+
                     except Exception as e:
                         # Don't fail payment processing if email fails
                         logger.error(

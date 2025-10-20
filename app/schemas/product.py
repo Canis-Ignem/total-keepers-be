@@ -74,7 +74,8 @@ class ProductBase(BaseModel):
     discount_price: Optional[float] = None  # Nullable, for sales
     short_description: Optional[str] = None  # Default/fallback short text
     description: Optional[str] = None  # Default/fallback markdown
-    img: Optional[str] = None  # Image path/URL
+    img: Optional[str] = None  # Image path/URL (legacy)
+    images: Optional[List[str]] = None  # List of publicly accessible blob URLs
     category: str = "GOALKEEPER_GLOVES"  # Product category
     tag: Optional[str] = None  # Main tag like "JUNIOR", "SENIOR", etc.
     priority: int = 0  # Display priority (higher = shown first)
@@ -100,6 +101,7 @@ class ProductUpdate(BaseModel):
     short_description: Optional[str] = None
     description: Optional[str] = None
     img: Optional[str] = None
+    images: Optional[List[str]] = None  # Allow updating blob storage URLs
     category: Optional[str] = None
     tag: Optional[str] = None
     priority: Optional[int] = None

@@ -11,7 +11,7 @@ if %errorlevel% neq 0 (
 )
 
 echo Step 2: Tagging backend image...
-podman tag total-keepers-be:latest totalkeepersregistry.azurecr.io/total-keepers-be:v1.1.3
+podman tag total-keepers-be:latest totalkeepersregistry.azurecr.io/total-keepers-be:v1.1.11
 if %errorlevel% neq 0 (
     echo ERROR: Failed to tag backend image
     pause
@@ -19,7 +19,7 @@ if %errorlevel% neq 0 (
 )
 
 echo Step 3: Pushing backend image to registry...
-podman push totalkeepersregistry.azurecr.io/total-keepers-be:v1.1.3
+podman push totalkeepersregistry.azurecr.io/total-keepers-be:v1.1.11
 if %errorlevel% neq 0 (
     echo ERROR: Failed to push backend image
     pause
@@ -28,5 +28,5 @@ if %errorlevel% neq 0 (
 
 echo.
 echo SUCCESS: Backend image built and pushed successfully!
-echo Image: totalkeepersregistry.azurecr.io/total-keepers-be:v1.1.3
+echo Image: totalkeepersregistry.azurecr.io/total-keepers-be:v1.1.11
 pause

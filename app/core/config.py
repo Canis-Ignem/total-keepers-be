@@ -66,5 +66,9 @@ class Settings(BaseSettings):
     GOOGLE_GMAIL_CLIENT_ID: str = os.getenv("GOOGLE_GMAIL_CLIENT_ID", "")
     ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@totalkeepers.com")
 
+    # Azure Communication Services Email settings
+    AZURE_COMMUNICATION_CONNECTION_STRING: Optional[str] = os.getenv("AZURE_COMMUNICATION_CONNECTION_STRING")
+    AZURE_EMAIL_SENDER: Optional[str] = os.getenv("AZURE_EMAIL_SENDER")
+
 
 settings = Settings()

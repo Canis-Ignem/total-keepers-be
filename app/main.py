@@ -1,5 +1,7 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from .api.v1.endpoints import (
     products,
     auth,
@@ -9,10 +11,15 @@ from .api.v1.endpoints import (
     orders,
     payments,
     discount_codes,
+    tk_admin,
 )
 from fastapi import Depends
 from app.core.config import settings
 from app.core.security import jwt_auth
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Total Keeper E-commerce API",
@@ -62,10 +69,22 @@ app.include_router(
 )
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["payments"])
 app.include_router(discount_codes.router, prefix="/api/v1", tags=["discount-codes"])
+# Admin authentication - explicitly no dependencies to allow unauthenticated login
+app.include_router(
+    tk_admin.router, 
+    prefix="/api/v1/tk-admin", 
+    tags=["admin"],
+    dependencies=[]  # Explicitly set empty dependencies
+)
+
+# Mount static files for admin panel at root level
+logger.info("Mounting static files from 'static' directory at '/admin'")
+app.mount("/admin", StaticFiles(directory="static", html=True), name="admin")
 
 
 @app.get("/")
 async def root():
+    logger.info("Root endpoint accessed")
     return {
         "message": "Total Keeper E-commerce API",
         "version": "1.0.0",
@@ -75,5 +94,6 @@ async def root():
             "social_login",
             "orders",
             "redsys_payments",
+            "admin_panel",
         ],
     }
